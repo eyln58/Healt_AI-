@@ -1,0 +1,8 @@
+fastapi
+httpx
+langgraph
+litellm
+pdfplumber
+pydantic
+python-multipart
+uvicorn[standard]
