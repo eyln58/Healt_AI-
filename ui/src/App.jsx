@@ -18,6 +18,14 @@ const PIPE_NODES = [
   { key: 'soap_drafter',         label: 'Clinical\nNote Draft',     icon: '📝' },
 ];
 
+const PARALLEL_AGENTS = [
+  { key:'condition_extractor',  icon:'🔬', label:'Diagnosis Identification', color:'purple', delay:0    },
+  { key:'medication_extractor', icon:'💊', label:'Medication Review',        color:'cyan',   delay:0.2  },
+  { key:'condition_coder',      icon:'🏷️', label:'ICD-10 Coding',           color:'blue',   delay:0.4  },
+  { key:'medication_coder',     icon:'📦', label:'RxNorm Coding',            color:'teal',   delay:0.6  },
+  { key:'soap_drafter',         icon:'📝', label:'Clinical Note Synthesis',  color:'amber',  delay:0.8  },
+];
+
 const RESULT_TABS = [
   { key: 'structured', label: 'Clinical Findings' },
   { key: 'coding',     label: 'Medical Codes'    },
@@ -100,7 +108,11 @@ export default function App() {
       const fd = new FormData();
       if (text.trim()) fd.append('text', text.trim());
       files.forEach(f => fd.append('files', f));
-      apply(await fetchJson(`${API_URL}/process`, { method: 'POST', body: fd }));
+      const [data] = await Promise.all([
+        fetchJson(`${API_URL}/process`, { method: 'POST', body: fd }),
+        new Promise(r => setTimeout(r, 4000)), // min display time for animation
+      ]);
+      apply(data);
       setNotice('Analysis complete — please review the clinical note before signing.');
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
@@ -213,30 +225,49 @@ export default function App() {
   );
 
   const renderPipeline = () => (
-    <div className="card">
-      <div className="pipeline-view">
-        <div className="spinner" />
-        <div className="pipeline-title">Analysing clinical documents…</div>
-        <div className="pipeline-sub">
-          Identifying diagnoses and medications, assigning medical codes, and preparing the clinical note draft.
+    <div className="card orch-card">
+      {/* Header */}
+      <div className="orch-header-row">
+        <div className="spinner-sm" />
+        <div className="orch-titles">
+          <div className="orch-main-title">⚡ AI Orchestration Engine</div>
+          <div className="orch-main-sub">5 agents executing in parallel · LangGraph pipeline</div>
         </div>
-        <div className="pipeline-nodes">
-          {PIPE_NODES.map((node, i) => {
-            const done   = completedNodes.has(node.key);
-            const active = !done && !PIPE_NODES.slice(0, i).some(n => !completedNodes.has(n.key));
-            return (
-              <div key={node.key} style={{ display: 'flex', alignItems: 'center' }}>
-                <div className={`pipe-node ${done ? 'done' : active ? 'active' : ''}`}>
-                  <div className="pipe-node-circle">{done ? '✓' : node.icon}</div>
-                  <div className="pipe-node-label">{node.label}</div>
+        <div className="orch-live-badge"><span className="live-dot" />LIVE</div>
+      </div>
+
+      {/* Parallel agent lanes */}
+      <div className="agent-grid">
+        {PARALLEL_AGENTS.map((agent) => {
+          const done = completedNodes.has(agent.key);
+          return (
+            <div key={agent.key}
+              className={`agent-row agent-${agent.color} ${done ? 'agent-done' : 'agent-active'}`}
+              style={{ animationDelay: `${agent.delay}s` }}>
+              <div className="agent-row-icon">{done ? '✅' : agent.icon}</div>
+              <div className="agent-row-body">
+                <div className="agent-row-name">{agent.label}</div>
+                <div className="agent-bar-wrap">
+                  <div className={`agent-bar ${done ? 'bar-done' : ''}`}>
+                    {!done && <div className="bar-scan" style={{ animationDelay:`${agent.delay}s` }} />}
+                    {!done && <div className="bar-packet" style={{ animationDelay:`${agent.delay + 0.3}s` }} />}
+                    {!done && <div className="bar-packet" style={{ animationDelay:`${agent.delay + 0.9}s` }} />}
+                  </div>
                 </div>
-                {i < PIPE_NODES.length - 1 && (
-                  <div className={`pipe-arrow ${done ? 'done' : ''}`}>→</div>
-                )}
               </div>
-            );
-          })}
-        </div>
+              <div className={`agent-tag ${done ? 'tag-done' : 'tag-run'}`}>
+                {done ? '✓ Done' : '⟳ Running'}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Footer data flow */}
+      <div className="orch-footer-row">
+        <span className="orch-pulse-dot" />
+        <span className="orch-footer-text">Data flowing through pipeline · Awaiting physician checkpoint</span>
+        <div className="orch-beam-track"><div className="orch-beam" /></div>
       </div>
     </div>
   );
