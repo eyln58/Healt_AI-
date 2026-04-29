@@ -647,18 +647,26 @@ def finalize_note(state: AgentState) -> AgentState:
 
 
 graph_builder = StateGraph(AgentState)
-graph_builder.add_node("condition_extractor", condition_extractor)
+graph_builder.add_node("condition_extractor",  condition_extractor)
 graph_builder.add_node("medication_extractor", medication_extractor)
-graph_builder.add_node("condition_coder", condition_coder)
-graph_builder.add_node("medication_coder", medication_coder)
-graph_builder.add_node("soap_drafter", soap_drafter)
-graph_builder.add_node("finalize_note", finalize_note)
+graph_builder.add_node("condition_coder",      condition_coder)
+graph_builder.add_node("medication_coder",     medication_coder)
+graph_builder.add_node("soap_drafter",         soap_drafter)
+graph_builder.add_node("finalize_note",        finalize_note)
+
+# ── Fan-out: her iki extraction branch'ı START'tan aynı anda başlar ──
 graph_builder.add_edge(START, "condition_extractor")
-graph_builder.add_edge("condition_extractor", "medication_extractor")
-graph_builder.add_edge("medication_extractor", "condition_coder")
-graph_builder.add_edge("condition_coder", "medication_coder")
+graph_builder.add_edge(START, "medication_extractor")
+
+# ── Her extractor kendi coder'ını besler (paralel akış devam eder) ──
+graph_builder.add_edge("condition_extractor",  "condition_coder")
+graph_builder.add_edge("medication_extractor", "medication_coder")
+
+# ── Fan-in: soap_drafter her iki coder bitince çalışır ──
+graph_builder.add_edge("condition_coder",  "soap_drafter")
 graph_builder.add_edge("medication_coder", "soap_drafter")
-graph_builder.add_edge("soap_drafter", "finalize_note")
+
+graph_builder.add_edge("soap_drafter",  "finalize_note")
 graph_builder.add_edge("finalize_note", END)
 GRAPH = graph_builder.compile(checkpointer=MemorySaver(), interrupt_after=["soap_drafter"])
 
